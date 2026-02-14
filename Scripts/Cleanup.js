@@ -5,25 +5,30 @@ const path = require("path");
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const modelId = process.env.MODEL_ID;
-const objPath = process.env.OBJ_FILE_PATH; // From YML
+const objPath = process.env.OBJ_FILE_PATH;
 
 async function run() {
-    console.log(`🚀 Starting Headless Ant Pipeline for: ${modelId}`);
+    console.log(`🚀 Pipeline Started: ${modelId}`);
 
     try {
-        // 1. RUN BLENDER PROCESS
-        const outputPath = `output/${modelId}_cleaned.obj`;
-        console.log(`🎨 Running Blender on: ${objPath}`);
+        // 1. Setup Output Folder Structure: output/CleanedFiles/[ID]/
+        const outputDir = path.join('output', 'CleanedFiles', modelId);
+        const outputFilePath = path.join(outputDir, `${modelId}.obj`);
         
-        // Command to run Blender in background
-        const blenderCmd = `blender -b -P Scripts/BlenderProc.py -- ${objPath} ${outputPath}`;
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        // 2. RUN BLENDER
+        console.log(`🎨 Processing: ${objPath}`);
+        const blenderCmd = `blender -b -P Scripts/BlenderProc.py -- "${objPath}" "${outputFilePath}"`;
         execSync(blenderCmd, { stdio: 'inherit' });
 
-        // 2. CLEANUP GITHUB INPUT FOLDER
-        console.log(`🧹 Cleaning up input folder: input/${modelId}`);
+        // 3. CLEANUP GITHUB INPUT
+        console.log(`🧹 Cleaning up: input/${modelId}`);
         await deleteFolderRecursive(`input/${modelId}`);
         
-        console.log("✅ Pipeline Complete!");
+        console.log(`✅ Success! File saved to: ${outputFilePath}`);
     } catch (error) {
         console.error("❌ Pipeline Failed:", error.message);
         process.exit(1);
@@ -32,18 +37,23 @@ async function run() {
 
 async function deleteFolderRecursive(repoPath) {
     const [owner, repo] = [process.env.REPO_OWNER, process.env.REPO_NAME];
-    const { data: files } = await octokit.repos.getContent({ owner, repo, path: repoPath });
+    try {
+        const { data: files } = await octokit.repos.getContent({ owner, repo, path: repoPath });
 
-    for (const file of files) {
-        if (file.type === "dir") {
-            await deleteFolderRecursive(file.path);
-        } else {
-            await octokit.repos.deleteFile({
-                owner, repo, path: file.path,
-                message: `Cleanup: ${modelId} processed`,
-                sha: file.sha
-            });
+        for (const file of files) {
+            if (file.type === "dir") {
+                await deleteFolderRecursive(file.path);
+            } else {
+                await octokit.repos.deleteFile({
+                    owner, repo,
+                    path: file.path,
+                    message: `Cleanup: ${modelId} processed`,
+                    sha: file.sha
+                });
+            }
         }
+    } catch (e) {
+        console.log("Note: Folder already empty or deleted.");
     }
 }
 
