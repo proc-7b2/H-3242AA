@@ -47,3 +47,13 @@ jobs:
           MODEL_ID: ${{ github.event.inputs.model_id }}
           OBJ_FILE_PATH: ${{ steps.search.outputs.obj_path }}
         run: node Scripts/Cleanup.js
+
+        # ... (after Execute Pipeline step)
+
+      - name: Commit and Push Cleaned Files
+        run: |
+          git config --global user.name "Headless Ant Bot"
+          git config --global user.email "ant-bot@github.com"
+          git add output/
+          # Only commit if there are actually changes to avoid errors
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Add cleaned model: ${{ github.event.inputs.model_id }}" && git push)
