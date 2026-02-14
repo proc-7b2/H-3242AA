@@ -19,12 +19,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y blender
 
-      # 2. Setup Node.js for the Cleanup/API script
+      # 2. Setup Node.js (REMOVED CACHE TO FIX ERROR)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
+      - name: Install JS Dependencies
+        run: |
+          # Create a dummy package.json if it doesn't exist to avoid errors
+          if [ ! -f package.json ]; then npm init -y; fi
+          npm install @octokit/rest
 
       - name: Install JS Dependencies
         run: npm install @octokit/rest
