@@ -9,17 +9,19 @@ on:
 jobs:
   process-and-cleanup:
     runs-on: ubuntu-latest
+    # --- ADD THIS PERMISSION BLOCK ---
+    permissions:
+      contents: write
+    # ---------------------------------
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 1. Install Blender (Required for Ubuntu Runners)
       - name: Install Blender
         run: |
           sudo apt-get update
           sudo apt-get install -y blender
 
-      # 2. Setup Node.js (REMOVED CACHE TO FIX ERROR)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,27 +29,16 @@ jobs:
 
       - name: Install JS Dependencies
         run: |
-          # Create a dummy package.json if it doesn't exist to avoid errors
           if [ ! -f package.json ]; then npm init -y; fi
           npm install @octokit/rest
 
-      - name: Install JS Dependencies
-        run: npm install @octokit/rest
-
-      # 3. Find the .obj file path automatically
       - name: Find OBJ Path
         id: search
         run: |
-          # Finds the first .obj file inside the input/model_id directory
           FOUND_PATH=$(find input/${{ github.event.inputs.model_id }} -name "*.obj" -print -quit)
-          if [ -z "$FOUND_PATH" ]; then
-            echo "::error::No .obj file found in input/${{ github.event.inputs.model_id }}"
-            exit 1
-          fi
+          if [ -z "$FOUND_PATH" ]; then exit 1; fi
           echo "obj_path=$FOUND_PATH" >> $GITHUB_OUTPUT
-          echo "Located: $FOUND_PATH"
 
-      # 4. Run the JS Script (Blender Process -> API Cleanup)
       - name: Execute Pipeline
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
