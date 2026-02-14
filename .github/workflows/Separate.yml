@@ -1,0 +1,39 @@
+name: Headless Ant Separation
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: 'ID of the model to separate'
+        required: true
+
+jobs:
+  separate-limbs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+
+      - name: Execute Separation
+        env:
+          MODEL_ID: ${{ github.event.inputs.model_id }}
+        run: blender --background --python Scripts/Separate.py -- "$MODEL_ID"
+
+      - name: Commit and Push Limbs
+        run: |
+          git config --global user.name "Headless Ant Bot"
+          git config --global user.email "ant-bot@github.com"
+          git add output/CleanedFiles/${{ github.event.inputs.model_id }}/Limbs/
+          
+          if ! git diff --cached --quiet; then
+            git commit -m "Limb Separation for: ${{ github.event.inputs.model_id }}"
+            for i in {1..5}; do
+              git pull --rebase origin main && git push origin main && exit 0 || sleep 10
+            done
+          fi
